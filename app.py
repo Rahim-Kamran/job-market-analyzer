@@ -372,8 +372,31 @@ if page == "🔮 Trending & Career Path":
     with right:
         st.write("**Category breakdown:**")
         cat_counts = trend_df["category"].value_counts()
-        for cat, count in cat_counts.items():
-            st.metric(cat, count)
+        color_map = {"High Growth 🔥": "#e63946", "Stable ➖": "#8172B2", "Declining 📉": "#6c757d"}
+        pie_colors = [color_map.get(c, "#4C72B0") for c in cat_counts.index]
+        fig, ax = plt.subplots(figsize=(4, 4))
+        wedges, texts, autotexts = ax.pie(
+            cat_counts.values, labels=cat_counts.index, autopct='%1.0f%%',
+            colors=pie_colors, wedgeprops=dict(width=0.45, edgecolor='white'),
+            textprops={'fontsize': 8}
+        )
+        st.pyplot(fig)
+
+    st.divider()
+    st.subheader("📍 Growth vs. Current Interest (all skills at a glance)")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for cat, color in {"High Growth 🔥": "#e63946", "Stable ➖": "#8172B2", "Declining 📉": "#6c757d"}.items():
+        subset = trend_df[trend_df["category"] == cat]
+        ax.scatter(subset["growth_rate"], subset["recent_avg_interest"],
+                    s=90, color=color, label=cat, alpha=0.85, edgecolors='white', linewidths=0.6)
+    for _, r in trend_df.iterrows():
+        ax.annotate(r["skill"], (r["growth_rate"], r["recent_avg_interest"]),
+                    fontsize=7, xytext=(4, 4), textcoords='offset points', alpha=0.75)
+    ax.axvline(0, color='gray', linestyle='--', linewidth=0.8, alpha=0.5)
+    ax.set_xlabel("Growth Rate →")
+    ax.set_ylabel("Recent Avg. Interest")
+    ax.legend(loc='upper left', fontsize=8)
+    st.pyplot(fig)
 
     st.divider()
 
