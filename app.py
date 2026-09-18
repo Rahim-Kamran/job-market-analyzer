@@ -269,6 +269,60 @@ class SimpleAgent:
 
 
 # ----------------------------------------------------------------
+# STEP 5 (NEW): TRENDING SKILLS ACROSS ALL DOMAINS + COURSE RECOMMENDATION
+# Uses skill_trend_analysis.csv (real Google Trends regression+clustering
+# output) and online_courses_clean.csv (multi-platform course catalog)
+# ----------------------------------------------------------------
+@st.cache_data
+def load_trend_data():
+    return pd.read_csv("skill_trend_analysis.csv")
+
+
+@st.cache_data
+def load_courses_data():
+    return pd.read_csv("online_courses_clean.csv")
+
+
+# Rough beginner -> job-ready time estimate per domain (simple lookup,
+# not model-derived — stated clearly in the UI as an estimate)
+TIME_ESTIMATES = {
+    "Frontend": "3-4 months",
+    "Backend": "4-5 months",
+    "Full Stack": "6-8 months",
+    "Cloud & DevOps": "4-6 months",
+    "Gaming": "6-9 months",
+    "Data Science": "6-8 months",
+    "Mobile": "4-5 months",
+    "Cybersecurity": "4-6 months",
+    "Blockchain": "5-7 months",
+    "Other": "4-6 months",
+}
+
+
+def recommend_courses(skill, courses_df, n=5):
+    import re
+
+    def search(term):
+        pattern = r'\b' + re.escape(term.lower()) + r'\b'
+        mask = courses_df['Skills'].fillna('').str.lower().str.contains(pattern, regex=True)
+        mask |= courses_df['Title'].fillna('').str.lower().str.contains(pattern, regex=True)
+        return courses_df[mask]
+
+    matches = search(skill)
+
+    # Only fall back to individual words if the full phrase found nothing
+    if matches.empty:
+        for word in skill.split():
+            if len(word) > 3:
+                matches = search(word)
+                if not matches.empty:
+                    break
+
+    matches = matches.sort_values('Rating', ascending=False, na_position='last')
+    return matches[['Title', 'Site', 'Category', 'Rating', 'Number of viewers']].head(n)
+
+
+# ----------------------------------------------------------------
 # LOAD DATA + BUILD OBJECTS (runs once, cached)
 # ----------------------------------------------------------------
 df = load_and_clean_data()
@@ -280,12 +334,86 @@ agent = SimpleAgent(tool)
 # SIDEBAR NAVIGATION
 # ----------------------------------------------------------------
 st.sidebar.title("📁 Navigation")
-page = st.sidebar.radio("Go to:", ["📊 Overview & EDA", "🤖 AI Agent & Model Outcome"])
+page = st.sidebar.radio("Go to:", [
+    "🔮 Trending & Career Path",
+    "📊 Overview & EDA",
+    "🤖 AI Agent & Model Outcome",
+])
+
+# ==================================================================
+# PAGE 0: TRENDING & CAREER PATH (all domains, live-trend based)
+# ==================================================================
+if page == "🔮 Trending & Career Path":
+    st.markdown("""
+    <div class="hero">
+        <h1>🔮 Trending & Career Path</h1>
+        <p>Real Google Trends growth data across Frontend, Backend, Cloud, Gaming, Data Science & more</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    trend_df = load_trend_data()
+    courses_df = load_courses_data()
+
+    st.markdown('<span class="section-badge">LIVE TREND ANALYSIS</span>', unsafe_allow_html=True)
+    st.subheader("🔥 Which skills are booming right now?")
+
+    left, right = st.columns([2, 1])
+
+    with left:
+        plot_df = trend_df.sort_values("growth_rate", ascending=True)
+        fig, ax = plt.subplots(figsize=(8, 9))
+        colors = plot_df["category"].map({
+            "High Growth 🔥": "#e63946", "Stable ➖": "#8172B2", "Declining 📉": "#6c757d"
+        }).fillna("#4C72B0")
+        ax.barh(plot_df["skill"], plot_df["growth_rate"], color=colors)
+        ax.set_xlabel("Growth Rate (regression slope)")
+        st.pyplot(fig)
+
+    with right:
+        st.write("**Category breakdown:**")
+        cat_counts = trend_df["category"].value_counts()
+        for cat, count in cat_counts.items():
+            st.metric(cat, count)
+
+    st.divider()
+
+    # ---------------- USER PREFERENCE ----------------
+    st.markdown('<span class="section-badge">YOUR CHOICE</span>', unsafe_allow_html=True)
+    st.subheader("🎯 What do you want to become?")
+
+    skill_choice = st.selectbox("Select your target skill/technology:", sorted(trend_df["skill"].unique()))
+
+    if skill_choice:
+        row = trend_df[trend_df["skill"] == skill_choice].iloc[0]
+        domain = row["domain"]
+
+        st.markdown(f"### Result: **{skill_choice}** ({domain})")
+
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Future Outlook", row["category"])
+        r2.metric("Growth Rate", f"{row['growth_rate']:.3f}")
+        r3.metric("Est. Time to Learn", TIME_ESTIMATES.get(domain, "4-6 months"))
+
+        if "High Growth" in row["category"]:
+            st.success(f"📈 **{skill_choice}** is trending upward — strong future demand expected. Good time to invest in this skill.")
+        elif "Stable" in row["category"]:
+            st.info(f"➖ **{skill_choice}** has steady, consistent demand — a safe, reliable career choice.")
+        else:
+            st.warning(f"📉 **{skill_choice}** interest is declining — consider pairing it with a complementary trending skill.")
+
+        st.write("**📚 Recommended Courses (Coursera & other platforms):**")
+        recs = recommend_courses(skill_choice, courses_df)
+        if len(recs) > 0:
+            st.dataframe(recs, use_container_width=True, hide_index=True)
+        else:
+            st.write("No direct course match found in the catalog for this exact keyword — try a related broader skill.")
+
+        st.caption("⚠️ Time estimates are rough guidelines based on typical learning paths, not model predictions. Growth rate is derived from 5-year Google Trends search-interest regression, a proxy signal — not a guarantee.")
 
 # ==================================================================
 # PAGE 1: OVERVIEW & EDA
 # ==================================================================
-if page == "📊 Overview & EDA":
+elif page == "📊 Overview & EDA":
     st.markdown("""
     <div class="hero">
         <h1>📊 Job Market Skill Demand — Overview</h1>

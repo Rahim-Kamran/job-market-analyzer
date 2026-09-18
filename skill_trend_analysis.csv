@@ -1,0 +1,33 @@
+skill,domain,growth_rate,recent_avg_interest,cluster,category
+Cybersecurity,Cybersecurity,0.23964781606526428,64.16666666666667,1,High Growth 🔥
+Machine Learning,Data Science,0.12779795630295612,42.916666666666664,1,High Growth 🔥
+Docker,Cloud & DevOps,0.09988453368590428,39.833333333333336,1,High Growth 🔥
+Blockchain,Blockchain,0.06478691110428297,44.916666666666664,1,High Growth 🔥
+AWS,Cloud & DevOps,0.06177431123059199,26.583333333333332,0,Stable ➖
+Game Development,Gaming,0.027746278371567994,7.166666666666667,0,Stable ➖
+Power BI,Data Science,0.023820890762060985,17.916666666666668,0,Stable ➖
+Android Development,Mobile,0.018537998292526444,4.416666666666667,0,Stable ➖
+Unreal Engine,Gaming,0.01771028397507048,6.583333333333333,0,Stable ➖
+Kubernetes,Cloud & DevOps,0.015586784728554069,6.75,0,Stable ➖
+Terraform,Cloud & DevOps,0.011419521713905763,6.5,0,Stable ➖
+Microsoft Azure,Cloud & DevOps,0.009760089624012187,2.4166666666666665,0,Stable ➖
+Python programming,Data Science,0.00935473980712021,5.083333333333333,0,Stable ➖
+SwiftUI,Mobile,0.008289487160753064,3.5833333333333335,0,Stable ➖
+Google Cloud Platform,Cloud & DevOps,0.002194560572440683,0.25,0,Stable ➖
+Ethical Hacking,Cybersecurity,0.001512305119317971,1.0833333333333333,0,Stable ➖
+Unity Engine,Gaming,0.0010719250713365628,0.9166666666666666,0,Stable ➖
+MERN Stack,Full Stack,0.0,0.0,0,Stable ➖
+Full Stack Developer,Full Stack,-0.0002929194561573305,3.6666666666666665,0,Stable ➖
+Solidity,Blockchain,-0.005079049886718904,1.6666666666666667,0,Stable ➖
+TypeScript,Frontend,-0.0051270913464986955,13.25,0,Stable ➖
+Vue JS,Frontend,-0.008398247687754531,0.5833333333333334,0,Stable ➖
+Flutter,Mobile,-0.010099716054955427,13.75,0,Stable ➖
+React Native,Mobile,-0.011007499472044375,9.0,0,Stable ➖
+Spring Boot,Backend,-0.020144384603913174,16.5,0,Stable ➖
+React JS,Frontend,-0.02752208489259564,1.75,0,Stable ➖
+.NET,Backend,-0.031226281614366524,43.166666666666664,2,Declining 📉
+Node JS,Backend,-0.041837439043227634,9.333333333333334,0,Stable ➖
+Django,Backend,-0.042450301276668434,24.25,0,Stable ➖
+Angular,Frontend,-0.0655946081468307,18.75,0,Stable ➖
+SQL,Data Science,-0.12351559395758538,51.833333333333336,2,Declining 📉
+JavaScript,Frontend,-0.19121134872728493,36.583333333333336,2,Declining 📉
