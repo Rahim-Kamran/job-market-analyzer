@@ -31,7 +31,56 @@ from collections import Counter
 # ----------------------------------------------------------------
 # PAGE CONFIG
 # ----------------------------------------------------------------
-st.set_page_config(page_title="Job Market Skill Demand Analyzer", layout="wide")
+st.set_page_config(page_title="Job Market Skill Demand Analyzer", layout="wide", page_icon="📊")
+
+# ----------------------------------------------------------------
+# CUSTOM STYLING - makes the app look polished instead of default
+# ----------------------------------------------------------------
+st.markdown("""
+<style>
+    [data-testid="stMetric"] {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.10);
+        padding: 18px 14px;
+        border-radius: 14px;
+    }
+    [data-testid="stMetricLabel"] { font-size: 0.85rem; opacity: 0.8; }
+    [data-testid="stMetricValue"] { font-size: 1.8rem; }
+
+    .hero {
+        padding: 2.2rem 2rem;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #4C72B0 0%, #7B4CB0 100%);
+        margin-bottom: 1.8rem;
+        box-shadow: 0 8px 24px rgba(76,114,176,0.25);
+    }
+    .hero h1 { color: white; margin: 0 0 6px 0; font-size: 2rem; }
+    .hero p { color: #e8e8f5; margin: 0; font-size: 1.02rem; }
+
+    .section-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #4C72B0, #7B4CB0);
+        color: white;
+        padding: 3px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    [data-testid="stChatMessage"] {
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    div[data-testid="stExpander"] {
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    hr { opacity: 0.15; }
+</style>
+""", unsafe_allow_html=True)
 
 # ----------------------------------------------------------------
 # STEP 1: DATA LOADING + CLEANING
@@ -237,8 +286,12 @@ page = st.sidebar.radio("Go to:", ["📊 Overview & EDA", "🤖 AI Agent & Model
 # PAGE 1: OVERVIEW & EDA
 # ==================================================================
 if page == "📊 Overview & EDA":
-    st.title("📊 Job Market Skill Demand — Overview")
-    st.caption("Cleaned job-postings data → exploratory insights")
+    st.markdown("""
+    <div class="hero">
+        <h1>📊 Job Market Skill Demand — Overview</h1>
+        <p>Cleaned job-postings data → exploratory insights on demand, seniority, and location trends</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # KPIs
     col1, col2, col3, col4 = st.columns(4)
@@ -300,11 +353,16 @@ if page == "📊 Overview & EDA":
 # PAGE 2: AI AGENT + MODEL OUTCOME (RESULTS PAGE)
 # ==================================================================
 else:
-    st.title("🤖 AI Agent & Model Outcome")
-    st.caption("Model results + a conversational agent that answers using real data (memory + tool-calling)")
+    st.markdown("""
+    <div class="hero">
+        <h1>🤖 AI Agent & Model Outcome</h1>
+        <p>Model results + a conversational agent that answers using real data (memory + tool-calling)</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # ---------------- MODEL RESULTS ----------------
-    st.header("1️⃣ Model Outcome")
+    st.markdown('<span class="section-badge">STEP 1</span>', unsafe_allow_html=True)
+    st.header("Model Outcome")
     st.write(
         "**Task:** Predict job seniority (`job_level`) from the job title text alone, "
         "using TF-IDF + Logistic Regression."
@@ -324,7 +382,8 @@ else:
     st.divider()
 
     # ---------------- AGENT CHAT ----------------
-    st.header("2️⃣ AI Research Agent (chat)")
+    st.markdown('<span class="section-badge">STEP 2</span>', unsafe_allow_html=True)
+    st.header("AI Research Agent (chat)")
     st.info(
         "🔧 This agent doesn't just generate text — it calls a **data tool** "
         "(MCP-style tool call) to fetch a real answer from the cleaned dataset, "
@@ -339,7 +398,8 @@ else:
 
     # render past messages
     for turn in st.session_state.chat_history:
-        with st.chat_message(turn["role"]):
+        avatar = "🧑‍💻" if turn["role"] == "user" else "🤖"
+        with st.chat_message(turn["role"], avatar=avatar):
             st.markdown(turn["text"])
             if turn.get("tool_used"):
                 st.caption(f"🔧 Tool called: `{turn['tool_used']}`")
@@ -348,13 +408,13 @@ else:
 
     if user_q:
         st.session_state.chat_history.append({"role": "user", "text": user_q})
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(user_q)
 
         answer_text, tool_used, matched_skill = agent.answer(user_q, st.session_state.agent_memory)
         st.session_state.agent_memory.append({"question": user_q, "skill": matched_skill})
 
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar="🤖"):
             st.markdown(answer_text)
             if tool_used:
                 st.caption(f"🔧 Tool called: `{tool_used}`")
