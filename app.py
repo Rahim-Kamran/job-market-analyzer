@@ -533,24 +533,58 @@ if page == "🔮 Trending & Career Path":
         else:
             st.warning(f"📉 **{skill_choice}** interest is declining — consider pairing it with a complementary trending skill.")
 
-        # ---------------- 1-YEAR TREND LINE ----------------
+        # ---------------- 1-YEAR TREND LINE + STATS ----------------
         try:
             raw_trends = load_raw_trends()
             if skill_choice in raw_trends.columns:
                 st.write(f"**📈 {skill_choice} — last 12 months search interest**")
+
                 last_year = raw_trends[skill_choice].dropna().tail(52)
-                fig, ax = plt.subplots(figsize=(11, 3.2))
+                start_val = last_year.iloc[0]
+                end_val = last_year.iloc[-1]
+                pct_change = ((end_val - start_val) / start_val * 100) if start_val > 0 else 0
+                high_val = last_year.max()
+                low_val = last_year.min()
+                high_date = last_year.idxmax().strftime("%b %Y")
+                low_date = last_year.idxmin().strftime("%b %Y")
+
+                s1, s2, s3, s4 = st.columns(4)
+                s1.metric("1-Year Change", f"{pct_change:+.1f}%",
+                           delta=f"{pct_change:+.1f}%", delta_color="normal")
+                s2.metric("Start (12mo ago)", f"{start_val:.0f}")
+                s3.metric("Now", f"{end_val:.0f}")
+                s4.metric(f"Peak ({high_date})", f"{high_val:.0f}")
+
                 line_color = color_map.get(row["category"], "#4C72B0")
+                fig, ax = plt.subplots(figsize=(11, 3.5))
                 ax.plot(last_year.index, last_year.values, color=line_color, linewidth=2.2)
                 ax.fill_between(last_year.index, last_year.values, color=line_color, alpha=0.15)
+
+                # mark peak and low points
+                ax.scatter([last_year.idxmax()], [high_val], color=line_color, s=60, zorder=5, edgecolors='white')
+                ax.scatter([last_year.idxmin()], [low_val], color="#6c757d", s=60, zorder=5, edgecolors='white')
+                ax.annotate(f"Peak: {high_val:.0f}", (last_year.idxmax(), high_val),
+                            xytext=(0, 10), textcoords='offset points', fontsize=8, ha='center')
+                ax.annotate(f"Low: {low_val:.0f}", (last_year.idxmin(), low_val),
+                            xytext=(0, -15), textcoords='offset points', fontsize=8, ha='center')
+
                 ax.set_ylabel("Interest (0-100)")
                 ax.spines[['top', 'right']].set_visible(False)
                 ax.grid(alpha=0.2)
                 fig.autofmt_xdate()
                 fig.tight_layout()
                 st.pyplot(fig, use_container_width=True)
+
+                if pct_change > 15:
+                    st.caption(f"📈 **{skill_choice}** interest grew **{pct_change:.0f}%** over the last year — strong upward momentum.")
+                elif pct_change < -15:
+                    st.caption(f"📉 **{skill_choice}** interest dropped **{abs(pct_change):.0f}%** over the last year.")
+                else:
+                    st.caption(f"➖ **{skill_choice}** interest has been relatively flat ({pct_change:+.0f}%) over the last year.")
+            else:
+                st.caption(f"ℹ️ '{skill_choice}' not found in the raw trends file columns — data may not have been fetched for this exact name.")
         except FileNotFoundError:
-            st.caption("ℹ️ Upload `live_google_trends.csv` to the repo to see the 1-year trend line for each skill.")
+            st.warning("⚠️ `live_google_trends.csv` not found in the app folder — upload it to GitHub (same folder as app.py) to see the 1-year trend line and growth stats.")
 
         st.write("**📚 Recommended Courses (Coursera & other platforms):**")
         recs = recommend_courses(skill_choice, courses_df)
