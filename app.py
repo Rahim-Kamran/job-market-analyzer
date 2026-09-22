@@ -83,6 +83,25 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------------------
+# MATPLOTLIB DARK THEME - makes every chart blend into the dark UI
+# instead of showing a jarring white box
+# ----------------------------------------------------------------
+plt.rcParams.update({
+    "figure.facecolor": "none",
+    "axes.facecolor": "none",
+    "savefig.facecolor": "none",
+    "text.color": "#e8e8f0",
+    "axes.labelcolor": "#e8e8f0",
+    "axes.edgecolor": "#4a4a5a",
+    "xtick.color": "#b8b8c8",
+    "ytick.color": "#b8b8c8",
+    "grid.color": "#33334a",
+    "legend.facecolor": "#1a1a2e",
+    "legend.edgecolor": "#4a4a5a",
+    "legend.labelcolor": "#e8e8f0",
+})
+
+# ----------------------------------------------------------------
 # STEP 1: DATA LOADING + CLEANING
 # ----------------------------------------------------------------
 @st.cache_data
@@ -343,6 +362,12 @@ def load_trend_data():
 
 
 @st.cache_data
+def load_raw_trends():
+    """Full weekly Google Trends history per skill, used to plot a 1-year line chart."""
+    return pd.read_csv("live_google_trends.csv", index_col=0, parse_dates=True)
+
+
+@st.cache_data
 def load_courses_data():
     return pd.read_csv("online_courses_clean.csv")
 
@@ -418,49 +443,69 @@ if page == "🔮 Trending & Career Path":
     trend_df = load_trend_data()
     courses_df = load_courses_data()
 
+    color_map = {"High Growth 🔥": "#e63946", "Stable ➖": "#9d8dd6", "Declining 📉": "#6c757d"}
+
+    # ---------------- TOP KPI STRIP ----------------
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Skills Tracked", len(trend_df))
+    k2.metric("🔥 High Growth", (trend_df["category"] == "High Growth 🔥").sum())
+    k3.metric("➖ Stable", (trend_df["category"] == "Stable ➖").sum())
+    k4.metric("📉 Declining", (trend_df["category"] == "Declining 📉").sum())
+
+    st.write("")  # small spacer
     st.markdown('<span class="section-badge">LIVE TREND ANALYSIS</span>', unsafe_allow_html=True)
     st.subheader("🔥 Which skills are booming right now?")
+    st.caption("Growth rate = slope of a 5-year Google Trends regression per skill. Higher = faster-rising interest.")
 
-    left, right = st.columns([2, 1])
+    left, right = st.columns([3, 2], gap="large")
 
     with left:
         plot_df = trend_df.sort_values("growth_rate", ascending=True)
-        fig, ax = plt.subplots(figsize=(8, 9))
-        colors = plot_df["category"].map({
-            "High Growth 🔥": "#e63946", "Stable ➖": "#8172B2", "Declining 📉": "#6c757d"
-        }).fillna("#4C72B0")
-        ax.barh(plot_df["skill"], plot_df["growth_rate"], color=colors)
+        fig, ax = plt.subplots(figsize=(7, 8))
+        colors = plot_df["category"].map(color_map).fillna("#4C72B0")
+        ax.barh(plot_df["skill"], plot_df["growth_rate"], color=colors, height=0.65)
         ax.set_xlabel("Growth Rate (regression slope)")
-        st.pyplot(fig)
+        ax.spines[['top', 'right']].set_visible(False)
+        ax.grid(axis='x', alpha=0.25)
+        fig.tight_layout()
+        st.pyplot(fig, use_container_width=True)
 
     with right:
-        st.write("**Category breakdown:**")
+        st.write("**Category breakdown**")
         cat_counts = trend_df["category"].value_counts()
-        color_map = {"High Growth 🔥": "#e63946", "Stable ➖": "#8172B2", "Declining 📉": "#6c757d"}
         pie_colors = [color_map.get(c, "#4C72B0") for c in cat_counts.index]
-        fig, ax = plt.subplots(figsize=(4, 4))
+        fig, ax = plt.subplots(figsize=(5, 5))
         wedges, texts, autotexts = ax.pie(
             cat_counts.values, labels=cat_counts.index, autopct='%1.0f%%',
-            colors=pie_colors, wedgeprops=dict(width=0.45, edgecolor='white'),
-            textprops={'fontsize': 8}
+            colors=pie_colors, wedgeprops=dict(width=0.45, edgecolor='#0e1117', linewidth=2),
+            textprops={'fontsize': 9, 'color': '#e8e8f0'}, pctdistance=0.78,
         )
-        st.pyplot(fig)
+        for at in autotexts:
+            at.set_color('white')
+            at.set_fontweight('bold')
+        fig.tight_layout()
+        st.pyplot(fig, use_container_width=True)
 
     st.divider()
-    st.subheader("📍 Growth vs. Current Interest (all skills at a glance)")
-    fig, ax = plt.subplots(figsize=(10, 5))
-    for cat, color in {"High Growth 🔥": "#e63946", "Stable ➖": "#8172B2", "Declining 📉": "#6c757d"}.items():
+    st.subheader("📍 Growth vs. Current Interest — all skills at a glance")
+    st.caption("Top-right = popular AND rising fast → best opportunities. Bottom-left = low interest, shrinking.")
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    for cat, color in color_map.items():
         subset = trend_df[trend_df["category"] == cat]
         ax.scatter(subset["growth_rate"], subset["recent_avg_interest"],
-                    s=90, color=color, label=cat, alpha=0.85, edgecolors='white', linewidths=0.6)
+                    s=110, color=color, label=cat, alpha=0.9, edgecolors='#0e1117', linewidths=1)
     for _, r in trend_df.iterrows():
         ax.annotate(r["skill"], (r["growth_rate"], r["recent_avg_interest"]),
-                    fontsize=7, xytext=(4, 4), textcoords='offset points', alpha=0.75)
-    ax.axvline(0, color='gray', linestyle='--', linewidth=0.8, alpha=0.5)
+                    fontsize=7.5, xytext=(5, 5), textcoords='offset points', alpha=0.85)
+    ax.axvline(0, color='#6c757d', linestyle='--', linewidth=0.9, alpha=0.6)
     ax.set_xlabel("Growth Rate →")
     ax.set_ylabel("Recent Avg. Interest")
-    ax.legend(loc='upper left', fontsize=8)
-    st.pyplot(fig)
+    ax.spines[['top', 'right']].set_visible(False)
+    ax.grid(alpha=0.2)
+    ax.legend(loc='upper left', fontsize=8.5, framealpha=0.9)
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
 
     st.divider()
 
@@ -474,7 +519,7 @@ if page == "🔮 Trending & Career Path":
         row = trend_df[trend_df["skill"] == skill_choice].iloc[0]
         domain = row["domain"]
 
-        st.markdown(f"### Result: **{skill_choice}** ({domain})")
+        st.markdown(f"### Result: **{skill_choice}** &nbsp;·&nbsp; _{domain}_")
 
         r1, r2, r3 = st.columns(3)
         r1.metric("Future Outlook", row["category"])
@@ -487,6 +532,25 @@ if page == "🔮 Trending & Career Path":
             st.info(f"➖ **{skill_choice}** has steady, consistent demand — a safe, reliable career choice.")
         else:
             st.warning(f"📉 **{skill_choice}** interest is declining — consider pairing it with a complementary trending skill.")
+
+        # ---------------- 1-YEAR TREND LINE ----------------
+        try:
+            raw_trends = load_raw_trends()
+            if skill_choice in raw_trends.columns:
+                st.write(f"**📈 {skill_choice} — last 12 months search interest**")
+                last_year = raw_trends[skill_choice].dropna().tail(52)
+                fig, ax = plt.subplots(figsize=(11, 3.2))
+                line_color = color_map.get(row["category"], "#4C72B0")
+                ax.plot(last_year.index, last_year.values, color=line_color, linewidth=2.2)
+                ax.fill_between(last_year.index, last_year.values, color=line_color, alpha=0.15)
+                ax.set_ylabel("Interest (0-100)")
+                ax.spines[['top', 'right']].set_visible(False)
+                ax.grid(alpha=0.2)
+                fig.autofmt_xdate()
+                fig.tight_layout()
+                st.pyplot(fig, use_container_width=True)
+        except FileNotFoundError:
+            st.caption("ℹ️ Upload `live_google_trends.csv` to the repo to see the 1-year trend line for each skill.")
 
         st.write("**📚 Recommended Courses (Coursera & other platforms):**")
         recs = recommend_courses(skill_choice, courses_df)
@@ -542,9 +606,19 @@ elif page == "📊 Overview & EDA":
 
     with left2:
         st.subheader("Seniority Split")
-        fig, ax = plt.subplots()
-        df['job_level'].value_counts().plot(kind='pie', autopct='%1.0f%%', ax=ax, ylabel='')
-        st.pyplot(fig)
+        fig, ax = plt.subplots(figsize=(5, 5))
+        vc = df['job_level'].value_counts()
+        wedges, texts, autotexts = ax.pie(
+            vc.values, labels=vc.index, autopct='%1.0f%%',
+            colors=["#4C72B0", "#7B4CB0", "#55A868"][:len(vc)],
+            wedgeprops=dict(width=0.45, edgecolor='#0e1117', linewidth=2),
+            textprops={'fontsize': 9, 'color': '#e8e8f0'}, pctdistance=0.78,
+        )
+        for at in autotexts:
+            at.set_color('white')
+            at.set_fontweight('bold')
+        fig.tight_layout()
+        st.pyplot(fig, use_container_width=True)
 
     with right2:
         st.subheader("Top 10 Hiring Locations")
@@ -647,13 +721,25 @@ else:
             st.markdown(user_q)
 
         if gemini_client is not None:
-            # ---- Real LLM agent path ----
-            try:
-                response = st.session_state.gemini_chat.send_message(user_q)
-                answer_text = response.text
-                tool_used = "Gemini decided the tool call automatically"
-            except Exception as e:
-                answer_text = f"Gemini API error: {e}"
+            # ---- Real LLM agent path (with retry for transient 503 errors) ----
+            import time as _time
+            answer_text = None
+            tool_used = "Gemini decided the tool call automatically"
+            last_error = None
+            for attempt in range(3):
+                try:
+                    response = st.session_state.gemini_chat.send_message(user_q)
+                    answer_text = response.text
+                    break
+                except Exception as e:
+                    last_error = e
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        _time.sleep(2 * (attempt + 1))  # wait a bit longer each retry
+                        continue
+                    else:
+                        break
+            if answer_text is None:
+                answer_text = f"Gemini API error after retries: {last_error}"
                 tool_used = None
         else:
             # ---- Fallback: old rule-based agent ----
