@@ -278,7 +278,7 @@ class SimpleAgent:
 from google import genai
 from google.genai import types
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
 
 # --- Tool functions Gemini can call. Docstrings are how Gemini
 # understands what each function does and when to use it. ---
