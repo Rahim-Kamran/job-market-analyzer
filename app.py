@@ -272,8 +272,13 @@ class SimpleAgent:
 # STEP 4b: REAL LLM AGENT (Google Gemini) - ChatGPT-style conversational agent
 # Uses the SAME DataTool underneath, but now a real LLM decides which
 # tool to call and generates natural-language answers, with real memory.
+# Uses the current "google-genai" SDK (the older "google-generativeai"
+# package is deprecated).
 # ----------------------------------------------------------------
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # --- Tool functions Gemini can call. Docstrings are how Gemini
 # understands what each function does and when to use it. ---
@@ -311,23 +316,20 @@ def total_jobs_lookup() -> str:
     return f"There are {tool.total_jobs()} total job postings."
 
 
+GEMINI_SYSTEM_INSTRUCTION = (
+    "You are a helpful job-market research assistant for a Data Science "
+    "job postings dataset. Always use the provided tools to answer questions "
+    "about job demand, skills, locations, or seniority — never guess numbers "
+    "yourself. Keep answers concise and friendly."
+)
+
+
 @st.cache_resource
-def get_gemini_model():
+def get_gemini_client():
     api_key = st.secrets.get("GEMINI_API_KEY", None)
     if not api_key:
         return None
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        tools=[skill_demand_lookup, top_skills_lookup, top_locations_lookup,
-               seniority_split_lookup, total_jobs_lookup],
-        system_instruction=(
-            "You are a helpful job-market research assistant for a Data Science "
-            "job postings dataset. Always use the provided tools to answer questions "
-            "about job demand, skills, locations, or seniority — never guess numbers "
-            "yourself. Keep answers concise and friendly."
-        ),
-    )
+    return genai.Client(api_key=api_key)
 
 
 # ----------------------------------------------------------------
@@ -598,9 +600,9 @@ else:
     st.markdown('<span class="section-badge">STEP 2</span>', unsafe_allow_html=True)
     st.header("AI Research Agent (chat)")
 
-    gemini_model = get_gemini_model()
+    gemini_client = get_gemini_client()
 
-    if gemini_model is not None:
+    if gemini_client is not None:
         st.info(
             "🔧 This is a real LLM (Google Gemini) agent — it understands your "
             "question naturally and calls a **data tool** to fetch the real answer "
@@ -619,8 +621,15 @@ else:
         st.session_state.chat_history = []
     if "agent_memory" not in st.session_state:
         st.session_state.agent_memory = []
-    if "gemini_history" not in st.session_state:
-        st.session_state.gemini_history = []
+    if gemini_client is not None and "gemini_chat" not in st.session_state:
+        st.session_state.gemini_chat = gemini_client.chats.create(
+            model=GEMINI_MODEL,
+            config=types.GenerateContentConfig(
+                tools=[skill_demand_lookup, top_skills_lookup, top_locations_lookup,
+                       seniority_split_lookup, total_jobs_lookup],
+                system_instruction=GEMINI_SYSTEM_INSTRUCTION,
+            ),
+        )
 
     # render past messages
     for turn in st.session_state.chat_history:
@@ -637,16 +646,11 @@ else:
         with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(user_q)
 
-        if gemini_model is not None:
+        if gemini_client is not None:
             # ---- Real LLM agent path ----
-            chat = gemini_model.start_chat(
-                history=st.session_state.gemini_history,
-                enable_automatic_function_calling=True,
-            )
             try:
-                response = chat.send_message(user_q)
+                response = st.session_state.gemini_chat.send_message(user_q)
                 answer_text = response.text
-                st.session_state.gemini_history = chat.history
                 tool_used = "Gemini decided the tool call automatically"
             except Exception as e:
                 answer_text = f"Gemini API error: {e}"
@@ -668,5 +672,6 @@ else:
     if st.button("🗑️ Clear conversation memory"):
         st.session_state.chat_history = []
         st.session_state.agent_memory = []
-        st.session_state.gemini_history = []
+        if "gemini_chat" in st.session_state:
+            del st.session_state.gemini_chat
         st.rerun()
