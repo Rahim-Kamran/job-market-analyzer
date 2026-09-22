@@ -269,6 +269,68 @@ class SimpleAgent:
 
 
 # ----------------------------------------------------------------
+# STEP 4b: REAL LLM AGENT (Google Gemini) - ChatGPT-style conversational agent
+# Uses the SAME DataTool underneath, but now a real LLM decides which
+# tool to call and generates natural-language answers, with real memory.
+# ----------------------------------------------------------------
+import google.generativeai as genai
+
+# --- Tool functions Gemini can call. Docstrings are how Gemini
+# understands what each function does and when to use it. ---
+
+def skill_demand_lookup(skill: str) -> str:
+    """Returns how many job postings mention a given technology or skill.
+
+    Args:
+        skill: The technology/skill name, e.g. 'python', 'aws', 'sql'.
+    """
+    count = tool.skill_demand(skill)
+    return f"'{skill}' appears in {count} out of {tool.total_jobs()} job postings."
+
+
+def top_skills_lookup() -> str:
+    """Returns the top 5 most in-demand skills across all job postings."""
+    results = tool.top_skills()
+    return "Top skills: " + ", ".join(f"{s} ({c} postings)" for s, c in results)
+
+
+def top_locations_lookup() -> str:
+    """Returns the top 5 hiring locations across all job postings."""
+    results = tool.top_locations()
+    return "Top locations: " + ", ".join(f"{l} ({c} postings)" for l, c in results.items())
+
+
+def seniority_split_lookup() -> str:
+    """Returns the breakdown of job postings by seniority level (e.g. Mid-Senior, Associate)."""
+    results = tool.seniority_split()
+    return "Seniority split: " + ", ".join(f"{l} ({c})" for l, c in results.items())
+
+
+def total_jobs_lookup() -> str:
+    """Returns the total number of job postings in the cleaned dataset."""
+    return f"There are {tool.total_jobs()} total job postings."
+
+
+@st.cache_resource
+def get_gemini_model():
+    api_key = st.secrets.get("GEMINI_API_KEY", None)
+    if not api_key:
+        return None
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        tools=[skill_demand_lookup, top_skills_lookup, top_locations_lookup,
+               seniority_split_lookup, total_jobs_lookup],
+        system_instruction=(
+            "You are a helpful job-market research assistant for a Data Science "
+            "job postings dataset. Always use the provided tools to answer questions "
+            "about job demand, skills, locations, or seniority — never guess numbers "
+            "yourself. Keep answers concise and friendly."
+        ),
+    )
+
+
+# ----------------------------------------------------------------
 # STEP 5 (NEW): TRENDING SKILLS ACROSS ALL DOMAINS + COURSE RECOMMENDATION
 # Uses skill_trend_analysis.csv (real Google Trends regression+clustering
 # output) and online_courses_clean.csv (multi-platform course catalog)
@@ -535,17 +597,30 @@ else:
     # ---------------- AGENT CHAT ----------------
     st.markdown('<span class="section-badge">STEP 2</span>', unsafe_allow_html=True)
     st.header("AI Research Agent (chat)")
-    st.info(
-        "🔧 This agent doesn't just generate text — it calls a **data tool** "
-        "(MCP-style tool call) to fetch a real answer from the cleaned dataset, "
-        "and remembers earlier turns in this conversation for follow-ups.",
-        icon="ℹ️",
-    )
+
+    gemini_model = get_gemini_model()
+
+    if gemini_model is not None:
+        st.info(
+            "🔧 This is a real LLM (Google Gemini) agent — it understands your "
+            "question naturally and calls a **data tool** to fetch the real answer "
+            "from the dataset, with genuine conversation memory.",
+            icon="✨",
+        )
+    else:
+        st.warning(
+            "⚠️ No Gemini API key configured — falling back to a simpler "
+            "rule-based agent. Add `GEMINI_API_KEY` in Streamlit secrets to "
+            "enable the full LLM-powered agent.",
+            icon="⚠️",
+        )
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "agent_memory" not in st.session_state:
         st.session_state.agent_memory = []
+    if "gemini_history" not in st.session_state:
+        st.session_state.gemini_history = []
 
     # render past messages
     for turn in st.session_state.chat_history:
@@ -562,8 +637,24 @@ else:
         with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(user_q)
 
-        answer_text, tool_used, matched_skill = agent.answer(user_q, st.session_state.agent_memory)
-        st.session_state.agent_memory.append({"question": user_q, "skill": matched_skill})
+        if gemini_model is not None:
+            # ---- Real LLM agent path ----
+            chat = gemini_model.start_chat(
+                history=st.session_state.gemini_history,
+                enable_automatic_function_calling=True,
+            )
+            try:
+                response = chat.send_message(user_q)
+                answer_text = response.text
+                st.session_state.gemini_history = chat.history
+                tool_used = "Gemini decided the tool call automatically"
+            except Exception as e:
+                answer_text = f"Gemini API error: {e}"
+                tool_used = None
+        else:
+            # ---- Fallback: old rule-based agent ----
+            answer_text, tool_used, matched_skill = agent.answer(user_q, st.session_state.agent_memory)
+            st.session_state.agent_memory.append({"question": user_q, "skill": matched_skill})
 
         with st.chat_message("assistant", avatar="🤖"):
             st.markdown(answer_text)
@@ -577,4 +668,5 @@ else:
     if st.button("🗑️ Clear conversation memory"):
         st.session_state.chat_history = []
         st.session_state.agent_memory = []
+        st.session_state.gemini_history = []
         st.rerun()
